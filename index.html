@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kev & Griff Sock'Em</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      color: #eee;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      font-size: 2rem;
+      margin: 10px 0 5px;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      background: linear-gradient(90deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    #ui-bar {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 5px;
+      font-size: 0.9rem;
+    }
+    #ui-bar .coins { color: #ffd93d; font-weight: bold; }
+    #ui-bar .round { color: #aaa; }
+    #ui-bar .score { font-weight: bold; }
+    canvas {
+      border: 2px solid #333;
+      border-radius: 8px;
+      background: #16213e;
+    }
+    #controls-wrap {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      margin-top: 10px;
+    }
+    .side-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 140px;
+      align-items: center;
+    }
+    .center-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      min-width: 200px;
+      padding: 0 20px;
+    }
+    button {
+      padding: 8px 18px;
+      border: 2px solid #444;
+      border-radius: 6px;
+      background: #2a2a4a;
+      color: #eee;
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    button:hover { background: #3a3a6a; border-color: #666; }
+    button:active { transform: scale(0.95); }
+    .btn-griffin { border-color: #4d96ff; }
+    .btn-griffin:hover { background: #4d96ff33; }
+    .btn-kevin { border-color: #ff6b6b; }
+    .btn-kevin:hover { background: #ff6b6b33; }
+    .btn-snack { border-color: #6bcb77; }
+    .btn-snack:hover { background: #6bcb7733; }
+    .btn-bet { border-color: #ffd93d; }
+    .btn-bet:hover { background: #ffd93d33; }
+    .btn-fight {
+      padding: 14px 40px;
+      font-size: 1.3rem;
+      font-weight: bold;
+      border: 3px solid #ff6b6b;
+      background: linear-gradient(135deg, #ff6b6b33, #ffd93d33);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+    .btn-fight:hover {
+      background: linear-gradient(135deg, #ff6b6b55, #ffd93d55);
+      border-color: #ffd93d;
+      transform: scale(1.05);
+    }
+    .btn-fight:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      transform: none;
+    }
+    #bet-panel {
+      display: none;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: #1a1a2eee;
+      border: 2px solid #ffd93d;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      z-index: 10;
+    }
+    #bet-panel h2 { color: #ffd93d; margin-bottom: 12px; }
+    #bet-panel .bet-row { display: flex; gap: 10px; justify-content: center; margin: 8px 0; }
+    #message {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2.5rem;
+      font-weight: bold;
+      pointer-events: none;
+      text-align: center;
+      text-shadow: 0 0 20px rgba(0,0,0,0.8);
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #instructions {
+      color: #666;
+      font-size: 0.75rem;
+      margin-top: 8px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Kev & Griff Sock'Em</h1>
+  <div id="ui-bar">
+    <span class="score" style="color:#4d96ff">Griffin: <span id="griffin-score">0</span></span>
+    <span class="coins">Coins: <span id="coin-count">100</span></span>
+    <span class="round">Round <span id="round-num">1</span></span>
+    <span id="mode-label" style="color:#6bcb77">PvP</span>
+    <span class="score" style="color:#ff6b6b">Kevin: <span id="kevin-score">0</span></span>
+  </div>
+  <div style="position:relative">
+    <canvas id="arena" width="800" height="450"></canvas>
+    <div id="message"></div>
+    <div id="bet-panel">
+      <h2>Place Your Bet!</h2>
+      <p style="margin-bottom:12px;color:#aaa">Who wins this round?</p>
+      <div class="bet-row">
+        <button class="btn-griffin" onclick="placeBet('griffin', 10)">Griffin (10)</button>
+        <button class="btn-griffin" onclick="placeBet('griffin', 25)">Griffin (25)</button>
+        <button class="btn-kevin" onclick="placeBet('kevin', 10)">Kevin (10)</button>
+        <button class="btn-kevin" onclick="placeBet('kevin', 25)">Kevin (25)</button>
+      </div>
+      <button style="margin-top:8px" onclick="placeBet(null, 0)">Skip Bet</button>
+    </div>
+  </div>
+  <div id="controls-wrap">
+    <div class="side-controls">
+      <button class="btn-snack" onclick="feedSnack('griffin')">🍕 Feed Griffin</button>
+    </div>
+    <div class="center-controls">
+      <button class="btn-fight" id="fight-btn" onclick="startFight()">Fight!</button>
+      <button class="btn-bet" id="bet-btn" onclick="showBetPanel()">💰 Place Bet</button>
+    </div>
+    <div class="side-controls">
+      <button class="btn-snack" onclick="feedSnack('kevin')">🌮 Feed Kevin</button>
+    </div>
+  </div>
+  <div id="instructions">
+    Feed snacks to charge up fighters • Bet coins on who wins • Boss drops in every few rounds!
+  </div>
+
+  <script>
+const canvas = document.getElementById('arena');
+const ctx = canvas.getContext('2d');
+
+// Game state
+let coins = 100;
+let round = 1;
+let griffinScore = 0;
+let kevinScore = 0;
+let currentBet = null;
+let gameState = 'waiting'; // waiting, fighting, roundOver
+let bossMode = false;
+let bossName = '';
+let messageTimer = 0;
+let particles = [];
+let snackParticles = [];
+
+// Fighters
+function makeFighter(name, x, color, facing) {
+  return {
+    name, x, y: 300, color, facing,
+    hp: 100, maxHp: 100,
+    snackPower: 0,
+    state: 'idle', // idle, punch, kick, hit, ko
+    stateTimer: 0,
+    attackCooldown: 0,
+    bobOffset: Math.random() * Math.PI * 2,
+    // KO fall animation
+    koAngle: 0,
+    koFallSpeed: 0,
+    koFalling: false,
+  };
+}
+
+let griffin = makeFighter('Griffin', 200, '#4d96ff', 1);
+let kevin = makeFighter('Kevin', 600, '#ff6b6b', -1);
+let boss = null;
+
+function makeBoss() {
+  bossName = Math.random() < 0.5 ? 'Joey' : 'Charlie';
+  return {
+    name: bossName,
+    x: 400, y: 100,
+    color: '#ffd93d',
+    hp: 200, maxHp: 200,
+    state: 'entering',
+    stateTimer: 0,
+    attackCooldown: 0,
+    bobOffset: 0,
+    targetY: 300,
+    facing: -1,
+    koAngle: 0,
+    koFallSpeed: 0,
+    koFalling: false,
+  };
+}
+
+// Drawing helpers
+function drawStickFigure(f, scale = 1) {
+  const s = scale;
+  const headR = 18 * s;
+  const bodyLen = 50 * s;
+  const limbLen = 35 * s;
+  const armY = f.y - bodyLen * 0.6;
+  const hipY = f.y;
+  const headY = f.y - bodyLen - headR;
+  const shoulderY = f.y - bodyLen;
+
+  const bob = (f.state === 'ko') ? 0 : Math.sin(f.bobOffset) * 3;
+  const adjustedY = y => y + bob;
+
+  ctx.save();
+
+  // KO rotation
+  if (f.koAngle !== 0) {
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.koAngle);
+    ctx.translate(-f.x, -f.y);
+  }
+
+  ctx.strokeStyle = f.color;
+  ctx.lineWidth = 3 * s;
+  ctx.lineCap = 'round';
+
+  if (f.snackPower > 50) {
+    ctx.shadowColor = f.color;
+    ctx.shadowBlur = f.snackPower / 5;
+  }
+
+  // Head
+  ctx.beginPath();
+  ctx.arc(f.x, adjustedY(headY), headR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Eyes
+  ctx.fillStyle = '#fff';
+  const eyeOff = 6 * f.facing;
+  ctx.beginPath();
+  ctx.arc(f.x + eyeOff - 4, adjustedY(headY) - 2, 3, 0, Math.PI * 2);
+  ctx.arc(f.x + eyeOff + 4, adjustedY(headY) - 2, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (f.state === 'ko') {
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 2;
+    [-4, 4].forEach(ox => {
+      const ex = f.x + eyeOff + ox;
+      const ey = adjustedY(headY) - 2;
+      ctx.beginPath(); ctx.moveTo(ex - 2, ey - 2); ctx.lineTo(ex + 2, ey + 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ex + 2, ey - 2); ctx.lineTo(ex - 2, ey + 2); ctx.stroke();
+    });
+    ctx.strokeStyle = f.color;
+    ctx.lineWidth = 3 * s;
+  }
+
+  // Body
+  ctx.beginPath();
+  ctx.moveTo(f.x, adjustedY(shoulderY));
+  ctx.lineTo(f.x, adjustedY(hipY));
+  ctx.stroke();
+
+  // Arms
+  let armAngle = 0;
+  let armExtend = limbLen;
+  if (f.state === 'punch') {
+    armAngle = -0.3 * f.facing;
+    armExtend = limbLen * 1.5;
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(f.x, adjustedY(armY));
+  const fArmX = f.x + Math.cos(armAngle) * armExtend * f.facing;
+  const fArmY = adjustedY(armY) + Math.sin(armAngle) * armExtend;
+  ctx.lineTo(fArmX, fArmY);
+  ctx.stroke();
+
+  if (f.state === 'punch') {
+    ctx.fillStyle = f.color;
+    ctx.beginPath();
+    ctx.arc(fArmX, fArmY, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(f.x, adjustedY(armY));
+  ctx.lineTo(f.x - 20 * f.facing, adjustedY(armY) + 25);
+  ctx.stroke();
+
+  // Legs
+  const legSpread = f.state === 'kick' ? 30 : 15;
+  ctx.beginPath();
+  ctx.moveTo(f.x, adjustedY(hipY));
+  ctx.lineTo(f.x - legSpread, adjustedY(hipY + limbLen));
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(f.x, adjustedY(hipY));
+  if (f.state === 'kick') {
+    ctx.lineTo(f.x + limbLen * 1.3 * f.facing, adjustedY(hipY + 10));
+  } else {
+    ctx.lineTo(f.x + legSpread, adjustedY(hipY + limbLen));
+  }
+  ctx.stroke();
+
+  // Snack power bar
+  if (f.snackPower > 0 && f.state !== 'ko') {
+    const barW = 40;
+    const barH = 4;
+    const barX = f.x - barW / 2;
+    const barY = adjustedY(hipY + limbLen + 10);
+    ctx.fillStyle = '#333';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#6bcb77';
+    ctx.fillRect(barX, barY, barW * (f.snackPower / 100), barH);
+  }
+
+  // Name tag
+  ctx.fillStyle = f.color;
+  ctx.font = 'bold 13px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillText(f.name, f.x, adjustedY(hipY + limbLen + 25));
+
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.restore();
+}
+
+function drawBoss(b) {
+  drawStickFigure({ ...b, snackPower: 0, facing: b.facing }, 1.4);
+
+  ctx.save();
+  if (b.koAngle !== 0) {
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.koAngle);
+    ctx.translate(-b.x, -b.y);
+  }
+  ctx.fillStyle = '#ffd93d';
+  const crownY = b.y - 70 * 1.4 - 25 * 1.4 + (b.state === 'ko' ? 0 : Math.sin(b.bobOffset) * 3);
+  ctx.beginPath();
+  ctx.moveTo(b.x - 15, crownY);
+  ctx.lineTo(b.x - 12, crownY - 12);
+  ctx.lineTo(b.x - 5, crownY - 4);
+  ctx.lineTo(b.x, crownY - 15);
+  ctx.lineTo(b.x + 5, crownY - 4);
+  ctx.lineTo(b.x + 12, crownY - 12);
+  ctx.lineTo(b.x + 15, crownY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawHealthBar(fighter, x, w) {
+  const barH = 16;
+  const y = 20;
+  const hpPct = Math.max(0, fighter.hp / fighter.maxHp);
+
+  ctx.fillStyle = '#333';
+  ctx.fillRect(x, y, w, barH);
+
+  const hpColor = hpPct > 0.5 ? '#6bcb77' : hpPct > 0.25 ? '#ffd93d' : '#ff6b6b';
+  ctx.fillStyle = hpColor;
+  ctx.fillRect(x, y, w * hpPct, barH);
+
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, barH);
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${fighter.name} ${Math.ceil(Math.max(0, fighter.hp))}/${fighter.maxHp}`, x + w / 2, y + 12);
+}
+
+function drawBackground() {
+  ctx.fillStyle = '#0f3460';
+  ctx.fillRect(0, 340, 800, 110);
+
+  ctx.strokeStyle = '#1a4a7a';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 800; i += 40) {
+    ctx.beginPath();
+    ctx.moveTo(i, 340);
+    ctx.lineTo(i, 450);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#ff6b6b44';
+  ctx.lineWidth = 2;
+  [250, 200].forEach(ry => {
+    ctx.beginPath();
+    ctx.moveTo(50, ry);
+    ctx.lineTo(750, ry);
+    ctx.stroke();
+  });
+}
+
+function spawnParticles(x, y, color, count = 8) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 8,
+      life: 30 + Math.random() * 20,
+      color,
+      size: 2 + Math.random() * 3,
+    });
+  }
+}
+
+function spawnSnackParticle(x, y, emoji) {
+  snackParticles.push({ x, y, vy: -2, life: 40, emoji });
+}
+
+function updateParticles() {
+  particles = particles.filter(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--;
+    return p.life > 0;
+  });
+  snackParticles = snackParticles.filter(p => {
+    p.y += p.vy; p.life--;
+    return p.life > 0;
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life / 50;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  snackParticles.forEach(p => {
+    ctx.globalAlpha = p.life / 40;
+    ctx.font = '20px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.emoji, p.x, p.y);
+  });
+  ctx.globalAlpha = 1;
+}
+
+// KO fall animation
+function updateKO(f, fallDirection) {
+  if (f.state === 'ko' && f.koFalling) {
+    const targetAngle = fallDirection * Math.PI / 2; // 90 degrees sideways
+    f.koFallSpeed += 0.003;
+    f.koAngle += f.koFallSpeed * fallDirection;
+    if (Math.abs(f.koAngle) >= Math.abs(targetAngle)) {
+      f.koAngle = targetAngle;
+      f.koFalling = false;
+    }
+  }
+}
+
+// AI fight logic
+function fighterAI(fighter, opponent, dt) {
+  if (fighter.state === 'ko' || gameState !== 'fighting') return;
+
+  fighter.bobOffset += 0.05;
+  fighter.stateTimer -= dt;
+  fighter.attackCooldown -= dt;
+
+  if (fighter.stateTimer <= 0 && (fighter.state === 'punch' || fighter.state === 'kick' || fighter.state === 'hit')) {
+    fighter.state = 'idle';
+  }
+
+  if (fighter.state !== 'idle') return;
+
+  const dist = Math.abs(fighter.x - opponent.x);
+
+  // Move toward opponent
+  if (dist > 75) {
+    fighter.x += (opponent.x > fighter.x ? 1 : -1) * (1.8 + fighter.snackPower / 60);
+  }
+
+  // Attack
+  if (dist < 100 && fighter.attackCooldown <= 0) {
+    const power = 1 + fighter.snackPower / 50;
+    if (Math.random() < 0.5) {
+      fighter.state = 'punch';
+      fighter.stateTimer = 14;
+      fighter.attackCooldown = 30 + Math.random() * 20;
+
+      const dmg = (7 + Math.random() * 6) * power;
+      opponent.hp -= dmg;
+      opponent.state = 'hit';
+      opponent.stateTimer = 10;
+      opponent.x += fighter.facing * 12;
+      spawnParticles(opponent.x, opponent.y - 40, '#fff');
+    } else {
+      fighter.state = 'kick';
+      fighter.stateTimer = 18;
+      fighter.attackCooldown = 35 + Math.random() * 20;
+
+      const dmg = (9 + Math.random() * 8) * power;
+      opponent.hp -= dmg;
+      opponent.state = 'hit';
+      opponent.stateTimer = 12;
+      opponent.x += fighter.facing * 18;
+      spawnParticles(opponent.x, opponent.y - 20, '#ffd93d');
+    }
+  }
+
+  fighter.x = Math.max(60, Math.min(740, fighter.x));
+  fighter.facing = opponent.x > fighter.x ? 1 : -1;
+}
+
+function bossAI(b, targets, dt) {
+  if (!b || b.state === 'ko') return;
+
+  b.bobOffset += 0.04;
+  b.stateTimer -= dt;
+  b.attackCooldown -= dt;
+
+  if (b.state === 'entering') {
+    b.y += 2;
+    if (b.y >= b.targetY) { b.y = b.targetY; b.state = 'idle'; }
+    return;
+  }
+
+  if (b.stateTimer <= 0 && (b.state === 'punch' || b.state === 'hit')) {
+    b.state = 'idle';
+  }
+  if (b.state !== 'idle') return;
+
+  const alive = targets.filter(t => t.hp > 0);
+  if (alive.length === 0) return;
+
+  const target = alive.reduce((a, c) =>
+    Math.abs(c.x - b.x) < Math.abs(a.x - b.x) ? c : a
+  );
+
+  const dist = Math.abs(b.x - target.x);
+  b.facing = target.x > b.x ? 1 : -1;
+
+  if (dist > 100) b.x += (target.x > b.x ? 1 : -1) * 1.8;
+
+  if (dist < 120 && b.attackCooldown <= 0) {
+    b.state = 'punch';
+    b.stateTimer = 18;
+    b.attackCooldown = 45 + Math.random() * 25;
+
+    const dmg = 10 + Math.random() * 8;
+    target.hp -= dmg;
+    target.state = 'hit';
+    target.stateTimer = 10;
+    target.x += b.facing * 18;
+    spawnParticles(target.x, target.y - 40, '#ffd93d', 12);
+  }
+
+  b.x = Math.max(80, Math.min(720, b.x));
+}
+
+function coopAI(fighter, bossTarget, dt) {
+  if (fighter.state === 'ko' || !bossTarget || bossTarget.state === 'ko') return;
+
+  fighter.bobOffset += 0.05;
+  fighter.stateTimer -= dt;
+  fighter.attackCooldown -= dt;
+
+  if (fighter.stateTimer <= 0 && (fighter.state === 'punch' || fighter.state === 'kick' || fighter.state === 'hit')) {
+    fighter.state = 'idle';
+  }
+  if (fighter.state !== 'idle') return;
+
+  const dist = Math.abs(fighter.x - bossTarget.x);
+  fighter.facing = bossTarget.x > fighter.x ? 1 : -1;
+
+  if (dist > 90) fighter.x += (bossTarget.x > fighter.x ? 1 : -1) * (1.8 + fighter.snackPower / 50);
+
+  if (dist < 110 && fighter.attackCooldown <= 0) {
+    const power = 1 + fighter.snackPower / 40;
+    fighter.state = Math.random() < 0.5 ? 'punch' : 'kick';
+    fighter.stateTimer = 15;
+    fighter.attackCooldown = 30 + Math.random() * 20;
+
+    const dmg = (5 + Math.random() * 7) * power;
+    bossTarget.hp -= dmg;
+    bossTarget.state = 'hit';
+    bossTarget.stateTimer = 8;
+    spawnParticles(bossTarget.x + (Math.random() - 0.5) * 30, bossTarget.y - 40, fighter.color, 6);
+  }
+
+  fighter.x = Math.max(60, Math.min(740, fighter.x));
+}
+
+function triggerKO(fighter, fallDir) {
+  fighter.state = 'ko';
+  fighter.hp = 0;
+  fighter.koFalling = true;
+  fighter.koFallSpeed = 0;
+  // fallDir: 1 = fall right, -1 = fall left
+  // Fall away from the winner
+  fighter.koAngle = 0;
+  fighter._fallDir = fallDir;
+}
+
+// Game loop
+function update() {
+  if (gameState === 'fighting') {
+    if (bossMode && boss) {
+      coopAI(griffin, boss, 1);
+      coopAI(kevin, boss, 1);
+      bossAI(boss, [griffin, kevin], 1);
+
+      if (boss.hp <= 0 && boss.state !== 'ko') {
+        triggerKO(boss, griffin.x < boss.x ? 1 : -1);
+        showMessage(`${bossName} defeated! +50 coins!`, '#6bcb77');
+        coins += 50;
+        gameState = 'roundOver';
+        updateUI();
+        autoNextRound();
+      }
+      if (griffin.hp <= 0 && griffin.state !== 'ko') triggerKO(griffin, -1);
+      if (kevin.hp <= 0 && kevin.state !== 'ko') triggerKO(kevin, 1);
+      if (griffin.state === 'ko' && kevin.state === 'ko' && boss.state !== 'ko') {
+        showMessage(`${bossName} wins! No bonus.`, '#ff6b6b');
+        gameState = 'roundOver';
+        autoNextRound();
+      }
+    } else {
+      fighterAI(griffin, kevin, 1);
+      fighterAI(kevin, griffin, 1);
+
+      if (griffin.hp <= 0 && griffin.state !== 'ko') {
+        triggerKO(griffin, -1);
+        kevinScore++;
+        resolveBet('kevin');
+        showMessage('Kevin wins! +1 point', '#ff6b6b');
+        gameState = 'roundOver';
+        updateUI();
+        autoNextRound();
+      }
+      if (kevin.hp <= 0 && kevin.state !== 'ko') {
+        triggerKO(kevin, 1);
+        griffinScore++;
+        resolveBet('griffin');
+        showMessage('Griffin wins! +1 point', '#4d96ff');
+        gameState = 'roundOver';
+        updateUI();
+        autoNextRound();
+      }
+    }
+  }
+
+  // Update KO animations
+  if (griffin.state === 'ko' && griffin.koFalling) updateKO(griffin, griffin._fallDir || -1);
+  if (kevin.state === 'ko' && kevin.koFalling) updateKO(kevin, kevin._fallDir || 1);
+  if (boss && boss.state === 'ko' && boss.koFalling) updateKO(boss, boss._fallDir || 1);
+
+  updateParticles();
+  if (messageTimer > 0) messageTimer--;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground();
+
+  drawHealthBar(griffin, 20, 300);
+  drawHealthBar(kevin, 480, 300);
+  if (boss && bossMode) drawHealthBar(boss, 250, 300);
+
+  drawStickFigure(griffin);
+  drawStickFigure(kevin);
+  if (boss && bossMode) drawBoss(boss);
+
+  drawParticles();
+
+  ctx.fillStyle = '#ffffff33';
+  ctx.font = 'bold 40px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillText(bossMode ? 'CO-OP' : 'VS', 400, 180);
+
+  const msgEl = document.getElementById('message');
+  if (messageTimer > 0) {
+    msgEl.style.opacity = 1;
+  } else {
+    msgEl.style.opacity = 0;
+  }
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// Actions
+function feedSnack(who) {
+  const fighter = who === 'griffin' ? griffin : kevin;
+  if (fighter.state === 'ko') return;
+  fighter.snackPower = Math.min(100, fighter.snackPower + 20);
+  const emoji = who === 'griffin' ? '🍕' : '🌮';
+  spawnSnackParticle(fighter.x, fighter.y - 80, emoji);
+  spawnParticles(fighter.x, fighter.y - 40, '#6bcb77', 5);
+}
+
+function startFight() {
+  if (gameState === 'fighting') return;
+
+  round++;
+  currentBet = null;
+
+  // Boss every 3 rounds
+  if (round % 3 === 0) {
+    bossMode = true;
+    boss = makeBoss();
+    griffin = makeFighter('Griffin', 200, '#4d96ff', 1);
+    kevin = makeFighter('Kevin', 600, '#ff6b6b', -1);
+    gameState = 'fighting';
+    document.getElementById('mode-label').textContent = `BOSS: ${bossName}`;
+    document.getElementById('mode-label').style.color = '#ffd93d';
+    showMessage(`${bossName} appears! Team up!`, '#ffd93d');
+  } else {
+    bossMode = false;
+    boss = null;
+    griffin = makeFighter('Griffin', 200, '#4d96ff', 1);
+    kevin = makeFighter('Kevin', 600, '#ff6b6b', -1);
+    gameState = 'fighting';
+    document.getElementById('mode-label').textContent = 'PvP';
+    document.getElementById('mode-label').style.color = '#6bcb77';
+    showMessage('Round ' + round + '! Fight!', '#ffd93d');
+  }
+
+  document.getElementById('fight-btn').disabled = true;
+  updateUI();
+}
+
+function autoNextRound() {
+  // Re-enable fight button after a delay
+  setTimeout(() => {
+    gameState = 'waiting';
+    document.getElementById('fight-btn').disabled = false;
+  }, 2500);
+}
+
+function showBetPanel() {
+  if (bossMode || gameState === 'fighting') {
+    showMessage("Bet before the fight!", '#ffd93d');
+    return;
+  }
+  if (currentBet) {
+    showMessage("Bet already placed!", '#ffd93d');
+    return;
+  }
+  document.getElementById('bet-panel').style.display = 'block';
+}
+
+function placeBet(on, amount) {
+  document.getElementById('bet-panel').style.display = 'none';
+  if (on && amount > coins) {
+    showMessage("Not enough coins!", '#ff6b6b');
+    return;
+  }
+  if (on) {
+    currentBet = { on, amount };
+    coins -= amount;
+    updateUI();
+    showMessage(`Bet ${amount} on ${on}!`, '#ffd93d');
+  }
+}
+
+function resolveBet(winner) {
+  if (!currentBet) return;
+  if (currentBet.on === winner) {
+    const winnings = currentBet.amount * 2;
+    coins += winnings;
+  }
+  currentBet = null;
+  updateUI();
+}
+
+function showMessage(text, color = '#fff') {
+  const el = document.getElementById('message');
+  el.textContent = text;
+  el.style.color = color;
+  messageTimer = 120;
+}
+
+function updateUI() {
+  document.getElementById('coin-count').textContent = coins;
+  document.getElementById('round-num').textContent = round;
+  document.getElementById('griffin-score').textContent = griffinScore;
+  document.getElementById('kevin-score').textContent = kevinScore;
+}
+
+// Start
+gameLoop();
+  </script>
+</body>
+</html>
